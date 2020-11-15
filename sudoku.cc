@@ -50,14 +50,25 @@ int main(int argc, char** argv) {
                                     {24, 25, 26}
                                     };
 
-    const int max_coordinate = 3;
+    const int max_coordinate = 3;//3*3 cube
+    const int max_orientations = 6; // x+,x-,y+,y-,z+,z-
     const int max_positions = numberOfPieces;
-    const operations_research::Domain domain(0, max_coordinate-1);
-    std::vector<std::string> orientations_dict = {"x","y","z"};
+    const operations_research::Domain domain(0, max_positions-1);
+    const std::vector<std::string> orientations_dict = {"increasing_x","increasing_y","increasing_z",
+                                                "decreasing_x","decreasing_y","decreasing_z"};
+    const std::vector<std::string> axis_dict = {"x","y","z","x","y","z"};
 
 
 
     /******************************* VARIABLES ************/
+
+    //create integer variables giving each cube's position
+    std::vector<operations_research::sat::IntVar> varsIntPosition;
+    for (int piece_i = 0; piece_i < numberOfPieces; ++piece_i)
+    {
+        varsIntPosition.push_back(cp_model.NewIntVar(domain)
+                                        .WithName("positionOfPiece_" + std::to_string(piece_i)));
+    }
 
     //create variables linking each piece position couple varsPositions[piece][position]
     std::vector< std::vector<operations_research::sat::BoolVar> > varsPiecesPositions;
@@ -98,7 +109,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < numberOfParts; ++i)
     {
         std::vector<operations_research::sat::BoolVar> partOrientation_l;
-        for(int orientation_i = 0; orientation_i < max_coordinate; ++orientation_i)
+        for(int orientation_i = 0; orientation_i < max_orientations; ++orientation_i)
         {
             partOrientation_l.push_back(cp_model.NewBoolVar()
                                                 .WithName("orientation-group_"  + std::to_string(i) + "-" + orientations_dict[orientation_i]));
@@ -108,6 +119,20 @@ int main(int argc, char** argv) {
 
 
     /******************************* CONSTRAINTS ************/
+
+    //One cube per position and one position per cube
+    cp_model.AddAllDifferent(varsIntPosition);
+
+    //Link varsIntPosition to varsPiecesPositions
+    for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
+    {
+        for (int position_i = 0; position_i < max_positions; ++position_i)
+        {
+            cp_model.AddEquality(varsIntPosition[cube_i],position_i)
+                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
+                    .WithName("Link-piece_" + std::to_string(cube_i) + "-position_" + std::to_string(position_i));
+        }
+    }
 
     //One position per cube using varsCube_.
     for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
@@ -142,7 +167,7 @@ int main(int argc, char** argv) {
     //Link positions to coordinates
     for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
     {
-        for (int position_i = 0; position_i < numberOfPieces; ++position_i)
+        for (int position_i = 0; position_i < max_positions; ++position_i)
         {
             cp_model.AddEquality(varsCube_x[cube_i][get_x_coordinate(position_i)],1)
                     .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
@@ -194,13 +219,15 @@ int main(int argc, char** argv) {
     //Perpendicularity
     for (int part_i = 0; part_i < numberOfParts-1; ++part_i)
     {
-        for (int orientation = 0; orientation < max_coordinate; ++orientation)
+        for (int orientation = 0; orientation < (max_orientations/2); ++orientation)
         {
             operations_research::sat::LinearExpr expr_l;
             expr_l.AddTerm(varsOrientation[part_i][orientation], 1);
             expr_l.AddTerm(varsOrientation[part_i+1][orientation], 1);
+            expr_l.AddTerm(varsOrientation[part_i][orientation+3], 1);
+            expr_l.AddTerm(varsOrientation[part_i+1][orientation+3], 1);
             cp_model.AddLessOrEqual(expr_l, 1)
-                    .WithName("change_direction_" + orientations_dict[orientation] + "-parts_" + std::to_string(part_i) + "_" + std::to_string(part_i+1));
+                    .WithName("change_direction_" + axis_dict[orientation] + "-parts_" + std::to_string(part_i) + "_" + std::to_string(part_i+1));
         }
     }
 
@@ -212,27 +239,68 @@ int main(int argc, char** argv) {
         {
             for(int coordinate_i = 0; coordinate_i < max_coordinate; ++coordinate_i)
             {
-                //part is oriented according to x axis
+                //part is oriented according to increasing x axis
                 cp_model.AddEquality(varsCube_y[pieces[piece_ind]][coordinate_i],varsCube_y[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][0])
-                        .WithName("x-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_x-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
                 cp_model.AddEquality(varsCube_z[pieces[piece_ind]][coordinate_i],varsCube_z[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][0])
-                        .WithName("x-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_x-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][0])
+                        .WithName("increasing_x-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+
+                cp_model.AddEquality(varsCube_y[pieces[piece_ind]][coordinate_i],varsCube_y[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][3])
+                        .WithName("decreasing_x-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddEquality(varsCube_z[pieces[piece_ind]][coordinate_i],varsCube_z[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][3])
+                        .WithName("decreasing_x-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddGreaterThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][3])
+                        .WithName("decreasing_x-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+
                 //part is oriented according to y axis
                 cp_model.AddEquality(varsCube_x[pieces[piece_ind]][coordinate_i],varsCube_x[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][1])
-                        .WithName("y-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_y-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
                 cp_model.AddEquality(varsCube_z[pieces[piece_ind]][coordinate_i],varsCube_z[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][1])
-                        .WithName("y-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_y-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][1])
+                        .WithName("increasing_y-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+
+                cp_model.AddEquality(varsCube_x[pieces[piece_ind]][coordinate_i],varsCube_x[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][4])
+                        .WithName("decreasing_y-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddEquality(varsCube_z[pieces[piece_ind]][coordinate_i],varsCube_z[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][4])
+                        .WithName("decreasing_y-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][4])
+                        .WithName("decreasing_y-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+
                 //part is oriented according to z axis
                 cp_model.AddEquality(varsCube_x[pieces[piece_ind]][coordinate_i],varsCube_x[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][2])
-                        .WithName("z-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_z-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
                 cp_model.AddEquality(varsCube_y[pieces[piece_ind]][coordinate_i],varsCube_y[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][2])
-                        .WithName("z-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                        .WithName("increasing_z-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][2])
+                        .WithName("increasing_z-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+
+                cp_model.AddEquality(varsCube_x[pieces[piece_ind]][coordinate_i],varsCube_x[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][5])
+                        .WithName("decreasing_z-oriented-force_X_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddEquality(varsCube_y[pieces[piece_ind]][coordinate_i],varsCube_y[pieces[piece_ind+1]][coordinate_i])
+                        .OnlyEnforceIf(varsOrientation[part_i][5])
+                        .WithName("decreasing_z-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
+                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                        .OnlyEnforceIf(varsOrientation[part_i][5])
+                        .WithName("decreasing_z-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
             }
         }
     }
@@ -254,9 +322,15 @@ int main(int argc, char** argv) {
 
     if (response.status() == operations_research::sat::CpSolverStatus::FEASIBLE
         || response.status() == operations_research::sat::CpSolverStatus::OPTIMAL) {
+
         LOG(INFO) << "\n positions: ";
         for (int i = 0; i < numberOfPieces; ++i) {
-        LOG(INFO) << "\n\tpiece " << i << " : ";
+            LOG(INFO) << "\n\tpiece " << i << " : " << operations_research::sat::SolutionIntegerValue(response, varsIntPosition[i]);
+        }
+
+        LOG(INFO) << "\n coordinates: ";
+        for (int i = 0; i < numberOfPieces; ++i) {
+            LOG(INFO) << "\n\tpiece " << i << " : ";
             for(int coordinate=0; coordinate < max_coordinate; coordinate++)
             {
                 if (operations_research::sat::SolutionBooleanValue(response, varsCube_x[i][coordinate]))
