@@ -301,44 +301,44 @@ int main(int argc, char** argv) {
             LOG(INFO) << "\n\tpiece " << i << " : " << operations_research::sat::SolutionIntegerValue(response, varsIntPosition[i]);
         }
 
-        LOG(INFO) << "\n coordinates: ";
-        for (int i = 0; i < numberOfPieces; ++i) {
-            LOG(INFO) << "\n\tpiece " << i << " : ";
-            for(int coordinate=0; coordinate < max_coordinate; coordinate++)
-            {
-                if (operations_research::sat::SolutionBooleanValue(response, varsCube_x[i][coordinate]))
-                {
-                    LOG(INFO) << "x " << coordinate << ", ";
-                }
-            }
+        // LOG(INFO) << "\n coordinates: ";
+        // for (int i = 0; i < numberOfPieces; ++i) {
+        //     LOG(INFO) << "\n\tpiece " << i << " : ";
+        //     for(int coordinate=0; coordinate < max_coordinate; coordinate++)
+        //     {
+        //         if (operations_research::sat::SolutionBooleanValue(response, varsCube_x[i][coordinate]))
+        //         {
+        //             LOG(INFO) << "x " << coordinate << ", ";
+        //         }
+        //     }
 
-            for(int coordinate=0; coordinate < max_coordinate; coordinate++)
-            {
-                if (operations_research::sat::SolutionBooleanValue(response, varsCube_y[i][coordinate]))
-                {
-                    LOG(INFO) << "y " << coordinate << ", ";
-                }
-            }
+        //     for(int coordinate=0; coordinate < max_coordinate; coordinate++)
+        //     {
+        //         if (operations_research::sat::SolutionBooleanValue(response, varsCube_y[i][coordinate]))
+        //         {
+        //             LOG(INFO) << "y " << coordinate << ", ";
+        //         }
+        //     }
 
-            for(int coordinate=0; coordinate < max_coordinate; coordinate++)
-            {
-                if (operations_research::sat::SolutionBooleanValue(response, varsCube_z[i][coordinate]))
-                {
-                    LOG(INFO) << "z " << coordinate << ", ";
-                }
-            }
-        }
+        //     for(int coordinate=0; coordinate < max_coordinate; coordinate++)
+        //     {
+        //         if (operations_research::sat::SolutionBooleanValue(response, varsCube_z[i][coordinate]))
+        //         {
+        //             LOG(INFO) << "z " << coordinate << ", ";
+        //         }
+        //     }
+        // }
 
-        LOG(INFO) << "\n\norientations: ";
-        for (int part_i = 0; part_i < numberOfParts; ++part_i) {
-            for(int orientation=0; orientation < max_orientations ; orientation++)
-            {
-                if (operations_research::sat::SolutionBooleanValue(response, varsOrientation[part_i][orientation]))
-                {
-                    LOG(INFO) << "\npart " << part_i << " : " << orientations_dict[orientation];
-                }
-            }
-        }
+        // LOG(INFO) << "\n\norientations: ";
+        // for (int part_i = 0; part_i < numberOfParts; ++part_i) {
+        //     for(int orientation=0; orientation < max_orientations ; orientation++)
+        //     {
+        //         if (operations_research::sat::SolutionBooleanValue(response, varsOrientation[part_i][orientation]))
+        //         {
+        //             LOG(INFO) << "\npart " << part_i << " : " << orientations_dict[orientation];
+        //         }
+        //     }
+        // }
     }
 
 
