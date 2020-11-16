@@ -21,8 +21,6 @@ int get_z_coordinate(int position)
 
 int main(int argc, char** argv) {
 
-
-
 	//create solver
     operations_research::sat::CpModelBuilder cp_model;
 
@@ -50,7 +48,7 @@ int main(int argc, char** argv) {
                                     {24, 25, 26}
                                     };
 
-    const int max_coordinate = 3;//3*3 cube
+    const int max_coordinate = 3;//0 1 2
     const int max_orientations = 6; // x+,x-,y+,y-,z+,z-
     const int max_positions = numberOfPieces;
     const operations_research::Domain domain(0, max_positions-1);
@@ -62,7 +60,7 @@ int main(int argc, char** argv) {
 
     /******************************* VARIABLES ************/
 
-    //create integer variables giving each cube's position
+    //create integer variables giving each cube's position varsIntPosition[piece]
     std::vector<operations_research::sat::IntVar> varsIntPosition;
     for (int piece_i = 0; piece_i < numberOfPieces; ++piece_i)
     {
@@ -104,7 +102,7 @@ int main(int argc, char** argv) {
         varsCube_z.push_back(vectZofPiece_l);
     }
 
-    //create variables varsOrientation[part][coordinate_value] //0=x, 1=y, 2=z
+    //create variables varsOrientation[part][orientation] //0=x, 1=y, 2=z
     std::vector< std::vector<operations_research::sat::BoolVar> > varsOrientation;
     for (int i = 0; i < numberOfParts; ++i)
     {
@@ -118,11 +116,8 @@ int main(int argc, char** argv) {
     }
 
 
-    /******************************* CONSTRAINTS ************/
-
-    //One cube per position and one position per cube
-    cp_model.AddAllDifferent(varsIntPosition);
-
+    /******************************* VARIABLES LINKING CONSTRAINTS ************/
+    
     //Link varsIntPosition to varsPiecesPositions
     for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
     {
@@ -134,7 +129,30 @@ int main(int argc, char** argv) {
         }
     }
 
-    //One position per cube using varsCube_.
+    //Link positions to coordinates
+    for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
+    {
+        for (int position_i = 0; position_i < max_positions; ++position_i)
+        {
+            cp_model.AddEquality(varsCube_x[cube_i][get_x_coordinate(position_i)],1)
+                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
+                    .WithName("x-link-piece_" + std::to_string(cube_i) + "_x_" +std::to_string(get_x_coordinate(position_i)) + "-ToPosition_" + std::to_string(position_i));
+            cp_model.AddEquality(varsCube_y[cube_i][get_y_coordinate(position_i)],1)
+                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
+                    .WithName("y-link-piece_" + std::to_string(cube_i) + "_y_" +std::to_string(get_y_coordinate(position_i)) + "-ToPosition_" + std::to_string(position_i));
+            cp_model.AddEquality(varsCube_z[cube_i][get_z_coordinate(position_i)],1)
+                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
+                    .WithName("z-link-piece_" + std::to_string(cube_i) + "_z_" +std::to_string(get_z_coordinate(position_i)) + "-ToPosition_" + std::to_string(position_i));
+        }
+    }
+
+    /******************************* PROBLEM CONSTRAINTS ************/
+
+
+    //One cube per position and one position per cube
+    cp_model.AddAllDifferent(varsIntPosition);
+
+    //One coordinate value per axis, for each piece
     for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
     {
         cp_model.AddEquality(operations_research::sat::LinearExpr::BooleanSum(varsCube_x[cube_i]), 1)
@@ -145,6 +163,7 @@ int main(int argc, char** argv) {
                 .WithName("one_Z_coordinate-cube_" + std::to_string(cube_i));
     }
 
+    //OPTIONAL
     //One position per cube using varsPiecesPositions
     for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
     {
@@ -152,6 +171,7 @@ int main(int argc, char** argv) {
                 .WithName("one_position_for_cube_" + std::to_string(cube_i));
     }
 
+    //OPTIONAL
     //One cube per position using varsPiecesPositions
     for (int position_i = 0; position_i < numberOfPieces; ++position_i)
     {
@@ -162,51 +182,6 @@ int main(int argc, char** argv) {
         }
         cp_model.AddEquality(expr_l, 1)
                     .WithName("one_cube_for_position_" + std::to_string(position_i));
-    }
-
-    //Link positions to coordinates
-    for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
-    {
-        for (int position_i = 0; position_i < max_positions; ++position_i)
-        {
-            cp_model.AddEquality(varsCube_x[cube_i][get_x_coordinate(position_i)],1)
-                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
-                    .WithName("x-link-cube_" + std::to_string(cube_i) + "-position_" + std::to_string(position_i));
-            cp_model.AddEquality(varsCube_y[cube_i][get_y_coordinate(position_i)],1)
-                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
-                    .WithName("y-link-cube_" + std::to_string(cube_i) + "-position_" + std::to_string(position_i));
-            cp_model.AddEquality(varsCube_z[cube_i][get_z_coordinate(position_i)],1)
-                    .OnlyEnforceIf(varsPiecesPositions[cube_i][position_i])
-                    .WithName("z-link-cube_" + std::to_string(cube_i) + "-position_" + std::to_string(position_i));
-        }
-    }
-
-    //9 cubes per plan
-    for(int coordinate_i = 0; coordinate_i < max_coordinate; ++coordinate_i)
-    {
-        operations_research::sat::LinearExpr exprX_l;
-        for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
-        {
-            exprX_l.AddTerm(varsCube_x[cube_i][coordinate_i], 1);
-        }
-        cp_model.AddEquality(exprX_l, 9)
-                .WithName("nine_cubes_in_plan_X_" + std::to_string(coordinate_i));
-
-        operations_research::sat::LinearExpr exprY_l;
-        for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
-        {
-            exprY_l.AddTerm(varsCube_y[cube_i][coordinate_i], 1);
-        }
-        cp_model.AddEquality(exprY_l, 9)
-                .WithName("nine_cubes_in_plan_Y_" + std::to_string(coordinate_i));
-
-        operations_research::sat::LinearExpr exprZ_l;
-        for (int cube_i = 0; cube_i < numberOfPieces; ++cube_i)
-        {
-            exprZ_l.AddTerm(varsCube_z[cube_i][coordinate_i], 1);
-        }
-        cp_model.AddEquality(exprZ_l, 9)
-                .WithName("nine_cubes_in_plan_Z_" + std::to_string(coordinate_i));
     }
 
     //One orientation per group
@@ -307,11 +282,9 @@ int main(int argc, char** argv) {
 
     //Fix the coordinate of the first part :
     // four consecutive 3-pieces parts ==> the first part can only be an edge
-    cp_model.AddHint(varsCube_x[0][0], 1);
-    cp_model.AddHint(varsCube_y[0][0], 1);
-    cp_model.AddHint(varsCube_z[0][2], 1);
-    cp_model.AddHint(varsOrientation[0][0], 1);
-
+    cp_model.AddEquality(varsIntPosition[0], 18);
+    cp_model.AddEquality(varsIntPosition[1], 19);
+    cp_model.AddEquality(varsIntPosition[2], 20);
 
     //output model
     std::cout << "model:\n" <<  cp_model.Build().DebugString();
@@ -336,7 +309,6 @@ int main(int argc, char** argv) {
                 if (operations_research::sat::SolutionBooleanValue(response, varsCube_x[i][coordinate]))
                 {
                     LOG(INFO) << "x " << coordinate << ", ";
-                    break;
                 }
             }
 
@@ -345,7 +317,6 @@ int main(int argc, char** argv) {
                 if (operations_research::sat::SolutionBooleanValue(response, varsCube_y[i][coordinate]))
                 {
                     LOG(INFO) << "y " << coordinate << ", ";
-                    break;
                 }
             }
 
@@ -354,23 +325,20 @@ int main(int argc, char** argv) {
                 if (operations_research::sat::SolutionBooleanValue(response, varsCube_z[i][coordinate]))
                 {
                     LOG(INFO) << "z " << coordinate << ", ";
-                    break;
-                }
-            }
-        }
-    
-        LOG(INFO) << "\n\norientations: ";
-        for (int part_i = 0; part_i < numberOfParts; ++part_i) {
-            for(int orientation=0; orientation < 3 ; orientation++)
-            {
-                if (operations_research::sat::SolutionBooleanValue(response, varsOrientation[part_i][orientation]))
-                {
-                    LOG(INFO) << "\npart " << part_i << " : " << orientations_dict[orientation];
-                    break;
                 }
             }
         }
 
+        LOG(INFO) << "\n\norientations: ";
+        for (int part_i = 0; part_i < numberOfParts; ++part_i) {
+            for(int orientation=0; orientation < max_orientations ; orientation++)
+            {
+                if (operations_research::sat::SolutionBooleanValue(response, varsOrientation[part_i][orientation]))
+                {
+                    LOG(INFO) << "\npart " << part_i << " : " << orientations_dict[orientation];
+                }
+            }
+        }
     }
 
 
