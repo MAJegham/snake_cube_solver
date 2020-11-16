@@ -277,7 +277,7 @@ int main(int argc, char** argv) {
                 cp_model.AddEquality(varsCube_z[pieces[piece_ind]][coordinate_i],varsCube_z[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][4])
                         .WithName("decreasing_y-oriented-force_Z_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
-                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                cp_model.AddGreaterThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
                         .OnlyEnforceIf(varsOrientation[part_i][4])
                         .WithName("decreasing_y-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
 
@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
                 cp_model.AddEquality(varsCube_y[pieces[piece_ind]][coordinate_i],varsCube_y[pieces[piece_ind+1]][coordinate_i])
                         .OnlyEnforceIf(varsOrientation[part_i][5])
                         .WithName("decreasing_z-oriented-force_Y_equality-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
-                cp_model.AddLessThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
+                cp_model.AddGreaterThan(varsIntPosition[pieces[piece_ind]],varsIntPosition[pieces[piece_ind+1]])
                         .OnlyEnforceIf(varsOrientation[part_i][5])
                         .WithName("decreasing_z-force-Part_" + std::to_string(part_i) + "-Pieces_" + std::to_string(pieces[piece_ind]) + "_" + std::to_string(pieces[piece_ind+1]));
             }
